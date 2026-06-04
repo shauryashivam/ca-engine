@@ -37,6 +37,9 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/db") {
       await handleDb(req, res); return;
     }
+    if (url.pathname === "/api/health") {
+      sendJson(res, 200, { status: "LOCAL_DEV", message: "Running locally — Redis not used, db.json is the store." }); return;
+    }
     if (url.pathname === "/health") {
       sendJson(res, 200, { ok: true }); return;
     }
