@@ -100,6 +100,23 @@
           </form>
           <ul id="theme-list" class="editable-list theme-list"></ul>
         </section>
+
+        <section class="sync-settings-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Cloud</p>
+              <h2>Sync Status</h2>
+            </div>
+            <span id="sync-status-badge" class="count-pill">Checking…</span>
+          </div>
+          <p id="sync-settings-desc" style="color:var(--muted);font-size:0.88rem;margin:8px 0 14px;line-height:1.55;">
+            All your articles, notes, highlights, and journal sync automatically. Use the button below to push immediately.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="force-sync-btn" class="secondary-button" type="button">☁ Push to cloud now</button>
+            <a href="/api/health" target="_blank" class="secondary-button" style="text-decoration:none;display:inline-flex;align-items:center;">Diagnose connection ↗</a>
+          </div>
+        </section>
       </section>
     </main>
 

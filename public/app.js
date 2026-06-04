@@ -90,6 +90,13 @@ els.clearArticles.addEventListener("click", () => {
   persist(); render();
 });
 
+document.querySelector("#force-sync-btn")?.addEventListener("click", async () => {
+  const btn = document.querySelector("#force-sync-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Syncing…"; }
+  await saveToDb();
+  if (btn) { btn.disabled = false; btn.textContent = "☁ Push to cloud now"; }
+});
+
 document.addEventListener("mousedown", (e) => {
   const toolbar = document.querySelector("#selection-toolbar");
   if (toolbar && !toolbar.contains(e.target)) toolbar.style.display = "none";
@@ -908,9 +915,32 @@ function persist() {
 
 function setSyncDot(status, title) {
   const dot = document.querySelector("#sync-dot");
-  if (!dot) return;
-  dot.dataset.status = status;
-  dot.title = title;
+  if (dot) { dot.dataset.status = status; dot.title = title; }
+
+  const badge = document.querySelector("#sync-status-badge");
+  if (badge) {
+    badge.textContent = title;
+    badge.style.background = status === "ok" ? "#dcfce7" : status === "error" ? "#fee2e2" : "#fef3c7";
+    badge.style.color      = status === "ok" ? "#166534" : status === "error" ? "#991b1b" : "#92400e";
+  }
+}
+
+// Single source of truth for what goes into the DB — excludes articleText (too large)
+function buildDbPayload() {
+  return {
+    feeds:      state.feeds,
+    themes:     state.themes,
+    seen:       state.seen.slice(-1000),
+    articles:   state.articles.slice(0, 200).map(a => ({
+      ...a,
+      summary: (a.summary || "").slice(0, 200)
+    })),
+    highlights: state.highlights,
+    notes:      state.notes,
+    dismissed:  state.dismissed,
+    journal:    state.journal,
+    lastScan:   state.lastScan
+  };
 }
 
 async function loadFromDb() {
@@ -919,8 +949,7 @@ async function loadFromDb() {
     const resp = await fetch("/api/db");
 
     if (resp.status === 503) {
-      // DB not configured — tell the user clearly
-      setSyncDot("error", "Cloud DB not connected — add Upstash Redis in Vercel dashboard");
+      setSyncDot("error", "Cloud DB not connected — visit /api/health for details");
       return;
     }
     if (!resp.ok) {
@@ -929,12 +958,25 @@ async function loadFromDb() {
     }
 
     const remote = await resp.json();
-    if (!remote || typeof remote !== "object" || !Object.keys(remote).length) {
-      setSyncDot("ok", "Cloud DB connected — no data yet (scan to populate)");
+    const isEmpty = !remote || typeof remote !== "object" || !Object.keys(remote).length;
+
+    if (isEmpty) {
+      // Redis is reachable but empty — seed it immediately with whatever is in localStorage
+      const hasLocal = state.articles.length > 0
+        || state.feeds.length > 0
+        || Object.keys(state.highlights).length > 0
+        || Object.keys(state.journal).length > 0;
+
+      if (hasLocal) {
+        setSyncDot("syncing", "First sync — uploading local data to cloud…");
+        await saveToDb(); // seed Redis with localStorage state right now
+      } else {
+        setSyncDot("ok", "Cloud DB ready — scan to populate");
+      }
       return;
     }
 
-    // Remote wins for all persisted keys — merge into current state
+    // Redis has data — merge it into current state (remote wins)
     const keys = ["feeds","themes","seen","articles","highlights","notes","dismissed","journal","lastScan"];
     let changed = false;
     for (const k of keys) {
@@ -952,7 +994,7 @@ async function loadFromDb() {
       localStorage.setItem("cae.dismissed",  JSON.stringify(state.dismissed));
       localStorage.setItem("cae.journal",    JSON.stringify(state.journal));
       render();
-      setStatus("Synced from cloud.", "ok");
+      setStatus(`Synced from cloud · ${remote.articles?.length || 0} articles`, "ok");
     }
 
     setSyncDot("ok", `Synced · ${new Date().toLocaleTimeString("en-IN")}`);
@@ -969,26 +1011,11 @@ function schedulDbSave() {
 
 async function saveToDb() {
   setSyncDot("syncing", "Saving to cloud…");
-  const payload = {
-    feeds:      state.feeds,
-    themes:     state.themes,
-    seen:       state.seen.slice(-1000),
-    articles:   state.articles.slice(0, 200).map(a => ({
-      ...a,
-      summary: (a.summary || "").slice(0, 200)
-    })),
-    highlights: state.highlights,
-    notes:      state.notes,
-    dismissed:  state.dismissed,
-    journal:    state.journal,
-    lastScan:   state.lastScan
-  };
-
   try {
     const resp = await fetch("/api/db", {
       method:  "POST",
       headers: { "content-type": "application/json" },
-      body:    JSON.stringify(payload)
+      body:    JSON.stringify(buildDbPayload())
     });
     if (resp.ok) {
       setSyncDot("ok", `Saved · ${new Date().toLocaleTimeString("en-IN")}`);
@@ -1002,6 +1029,15 @@ async function saveToDb() {
     setSyncDot("error", "Save failed — check network");
   }
 }
+
+// Last-ditch save on page unload using sendBeacon (fire-and-forget, survives tab close)
+window.addEventListener("beforeunload", () => {
+  clearTimeout(dbSaveTimer);
+  try {
+    const blob = new Blob([JSON.stringify(buildDbPayload())], { type: "application/json" });
+    navigator.sendBeacon("/api/db", blob);
+  } catch {}
+});
 
 function load(key, fallback) {
   try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; }
