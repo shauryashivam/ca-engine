@@ -906,12 +906,33 @@ function persist() {
 
 // ─── Cloud DB sync ────────────────────────────────────────────────────────────
 
+function setSyncDot(status, title) {
+  const dot = document.querySelector("#sync-dot");
+  if (!dot) return;
+  dot.dataset.status = status;
+  dot.title = title;
+}
+
 async function loadFromDb() {
+  setSyncDot("syncing", "Connecting to cloud…");
   try {
     const resp = await fetch("/api/db");
-    if (!resp.ok) return; // DB not available (e.g. local dev without db.json yet)
+
+    if (resp.status === 503) {
+      // DB not configured — tell the user clearly
+      setSyncDot("error", "Cloud DB not connected — add Upstash Redis in Vercel dashboard");
+      return;
+    }
+    if (!resp.ok) {
+      setSyncDot("error", `DB error ${resp.status}`);
+      return;
+    }
+
     const remote = await resp.json();
-    if (!remote || typeof remote !== "object" || !Object.keys(remote).length) return;
+    if (!remote || typeof remote !== "object" || !Object.keys(remote).length) {
+      setSyncDot("ok", "Cloud DB connected — no data yet (scan to populate)");
+      return;
+    }
 
     // Remote wins for all persisted keys — merge into current state
     const keys = ["feeds","themes","seen","articles","highlights","notes","dismissed","journal","lastScan"];
@@ -922,7 +943,6 @@ async function loadFromDb() {
     if (remote.lastScan) localStorage.setItem("cae.lastScan", remote.lastScan);
 
     if (changed) {
-      // Refresh localStorage cache then re-render with cloud state
       localStorage.setItem("cae.feeds",      JSON.stringify(state.feeds));
       localStorage.setItem("cae.themes",     JSON.stringify(state.themes));
       localStorage.setItem("cae.articles",   JSON.stringify(state.articles));
@@ -934,8 +954,11 @@ async function loadFromDb() {
       render();
       setStatus("Synced from cloud.", "ok");
     }
-  } catch {
-    // Silently fail — localStorage state is already loaded and shown
+
+    setSyncDot("ok", `Synced · ${new Date().toLocaleTimeString("en-IN")}`);
+  } catch (err) {
+    console.warn("loadFromDb failed:", err);
+    setSyncDot("error", "Cloud sync unavailable — using local storage");
   }
 }
 
@@ -945,14 +968,14 @@ function schedulDbSave() {
 }
 
 async function saveToDb() {
-  // Exclude articleText (full HTML/text bodies) — too large for Redis, re-fetched on demand
+  setSyncDot("syncing", "Saving to cloud…");
   const payload = {
     feeds:      state.feeds,
     themes:     state.themes,
     seen:       state.seen.slice(-1000),
     articles:   state.articles.slice(0, 200).map(a => ({
       ...a,
-      summary: (a.summary || "").slice(0, 200)  // truncate long summaries
+      summary: (a.summary || "").slice(0, 200)
     })),
     highlights: state.highlights,
     notes:      state.notes,
@@ -962,13 +985,21 @@ async function saveToDb() {
   };
 
   try {
-    await fetch("/api/db", {
+    const resp = await fetch("/api/db", {
       method:  "POST",
       headers: { "content-type": "application/json" },
       body:    JSON.stringify(payload)
     });
-  } catch {
-    // Fire-and-forget — localStorage is the source of truth for this session
+    if (resp.ok) {
+      setSyncDot("ok", `Saved · ${new Date().toLocaleTimeString("en-IN")}`);
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      console.warn("DB save failed:", resp.status, err);
+      setSyncDot("error", err.error || `Save failed (${resp.status})`);
+    }
+  } catch (err) {
+    console.warn("DB save network error:", err);
+    setSyncDot("error", "Save failed — check network");
   }
 }
 
