@@ -1,0 +1,8 @@
+{
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": "npm install",
+  "functions": {
+    "api/**/*.mjs": { "runtime": "nodejs20.x" }
+  }
+}

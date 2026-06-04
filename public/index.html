@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shivam Shaurya's Current Affairs Engine</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">UPSC Current Affairs</p>
+        <h1>Shivam Shaurya's Current Affairs Engine</h1>
+      </div>
+      <div class="header-actions">
+        <nav class="top-tabs" aria-label="Primary views">
+          <button id="articles-tab" class="active" type="button" data-tab="articles">Articles</button>
+          <button id="highlights-tab" type="button" data-tab="highlights">Highlights</button>
+          <button id="journal-tab" type="button" data-tab="journal">Journal</button>
+          <button id="settings-tab" type="button" data-tab="settings">Settings</button>
+        </nav>
+        <button id="scan-button" class="primary-button" type="button">Refresh RSS</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="articles-view" class="view active-view" aria-label="Articles">
+        <div class="stats-grid" aria-label="Engine status">
+          <div>
+            <span id="feed-count">0</span>
+            <small>Feeds</small>
+          </div>
+          <div>
+            <span id="theme-count">0</span>
+            <small>Themes</small>
+          </div>
+          <div>
+            <span id="article-count">0</span>
+            <small>Shown</small>
+          </div>
+          <div>
+            <span id="new-count">0</span>
+            <small>New</small>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div>
+            <span class="label">Last scan</span>
+            <strong id="last-scan">Not scanned yet</strong>
+          </div>
+          <input id="search" type="search" placeholder="Search articles, feeds, themes">
+          <select id="source-filter" aria-label="Filter by source">
+            <option>All Sources</option>
+          </select>
+          <button id="clear-articles" class="secondary-button" type="button">Clear</button>
+        </div>
+
+        <div id="scan-status" class="status" role="status">Ready to scan.</div>
+        <nav id="theme-filters" class="filters" aria-label="Theme filters"></nav>
+
+        <div class="article-workbench">
+          <section id="article-list" class="article-list" aria-label="Fetched articles"></section>
+          <aside id="preview-pane" class="preview-pane" aria-label="Article preview"></aside>
+        </div>
+      </section>
+
+      <section id="highlights-view" class="view highlights-view" aria-label="Highlights and notes"></section>
+      <section id="journal-view" class="view journal-view" aria-label="Weekly journal"></section>
+
+      <section id="settings-view" class="view settings-view" aria-label="Engine settings">
+        <section>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Configuration</p>
+              <h2>RSS Feeds</h2>
+            </div>
+            <span class="count-pill"><span id="settings-feed-count">0</span> active</span>
+          </div>
+          <form id="feed-form" class="stack-form">
+            <input id="feed-url" type="url" placeholder="https://example.com/rss" required>
+            <button class="secondary-button" type="submit">Add Feed</button>
+          </form>
+          <ul id="feed-list" class="editable-list"></ul>
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Classifier</p>
+              <h2>Themes</h2>
+            </div>
+            <span class="count-pill"><span id="settings-theme-count">0</span> active</span>
+          </div>
+          <form id="theme-form" class="stack-form">
+            <input id="theme-name" type="text" placeholder="Theme name">
+            <textarea id="theme-keywords" rows="3" placeholder="Comma-separated keywords"></textarea>
+            <button class="secondary-button" type="submit">Save Theme</button>
+          </form>
+          <ul id="theme-list" class="editable-list theme-list"></ul>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
